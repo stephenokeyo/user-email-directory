@@ -1,0 +1,1035 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#087b45">
+  <title>Workforce Directory</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --green: #087b45;
+      --green-dark: #06683a;
+      --green-soft: #e9f5ee;
+      --ink: #172a22;
+      --muted: #64736c;
+      --line: #dce5df;
+      --surface: #fff;
+      --canvas: #f3f6f4;
+      --danger: #b42318;
+      font-family: Inter, "Segoe UI", Arial, sans-serif;
+      font-synthesis: none;
+      text-rendering: optimizeLegibility;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      min-width: 320px;
+      min-height: 100vh;
+      margin: 0;
+      color: var(--ink);
+      background: var(--canvas);
+    }
+
+    button, input { font: inherit; }
+    button { cursor: pointer; }
+
+    .app-shell {
+      display: flex;
+      flex-direction: column;
+      width: min(100% - 32px, 1440px);
+      height: calc(100vh - 40px);
+      min-height: 600px;
+      margin: 20px auto;
+      overflow: hidden;
+      background: var(--surface);
+      border: 1px solid #cbd8d0;
+      border-radius: 12px;
+      box-shadow: 0 12px 36px rgb(22 51 35 / 9%);
+    }
+
+    .topbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 20px;
+      padding: 18px 26px;
+      color: #fff;
+      background: var(--green);
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 13px;
+      min-width: 0;
+    }
+
+    .brand-mark {
+      display: grid;
+      width: 42px;
+      height: 42px;
+      flex: 0 0 auto;
+      place-items: center;
+      color: var(--green);
+      background: #fff;
+      border-radius: 10px;
+      font-weight: 800;
+      font-size: 19px;
+    }
+
+    .brand h1 {
+      margin: 0;
+      font-size: clamp(16px, 2vw, 20px);
+      letter-spacing: -.025em;
+    }
+
+    .brand p {
+      margin: 4px 0 0;
+      color: rgb(255 255 255 / 79%);
+      font-size: 13px;
+    }
+
+    .record-count {
+      flex: 0 0 auto;
+      font-size: 13px;
+      color: rgb(255 255 255 / 90%);
+    }
+
+    .toolbar {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 10px;
+      padding: 16px 24px;
+      border-bottom: 1px solid var(--line);
+    }
+
+    .tabs {
+      display: flex;
+      gap: 5px;
+      padding: 10px 24px 0;
+      border-bottom: 1px solid var(--line);
+    }
+
+    .tab-button {
+      padding: 11px 15px;
+      color: var(--muted);
+      background: transparent;
+      border: 0;
+      border-bottom: 2px solid transparent;
+      font-size: 13px;
+      font-weight: 650;
+    }
+
+    .tab-button[aria-selected="true"] {
+      color: var(--green);
+      border-bottom-color: var(--green);
+    }
+
+    [hidden] { display: none !important; }
+
+    .button {
+      display: inline-flex;
+      min-height: 42px;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      padding: 0 15px;
+      color: #24352c;
+      background: #fff;
+      border: 1px solid #d3ded7;
+      border-radius: 8px;
+      font-size: 13px;
+      font-weight: 650;
+      transition: background .15s ease, border-color .15s ease, transform .15s ease;
+    }
+
+    .button:hover { background: #f5f8f6; border-color: #b8c9bf; }
+    .button:active { transform: translateY(1px); }
+    .button:focus-visible, input:focus-visible { outline: 3px solid #91d4ae; outline-offset: 2px; }
+
+    .button-primary {
+      color: #fff;
+      background: var(--green);
+      border-color: var(--green);
+    }
+
+    .button-primary:hover { color: #fff; background: var(--green-dark); border-color: var(--green-dark); }
+    .button-danger { color: var(--danger); }
+    .button-small { min-height: 32px; padding: 0 10px; font-size: 12px; }
+
+    .toolbar-spacer { flex: 1 1 auto; }
+
+    .search {
+      position: relative;
+      width: min(100%, 330px);
+    }
+
+    .search span {
+      position: absolute;
+      top: 50%;
+      left: 13px;
+      color: var(--muted);
+      transform: translateY(-50%);
+      pointer-events: none;
+    }
+
+    .search input {
+      width: 100%;
+      height: 42px;
+      padding: 0 13px 0 38px;
+      color: var(--ink);
+      background: #fff;
+      border: 1px solid #d3ded7;
+      border-radius: 8px;
+      font-size: 13px;
+    }
+
+    .formula-bar {
+      display: grid;
+      grid-template-columns: auto 38px 1fr;
+      min-height: 42px;
+      align-items: center;
+      border-bottom: 1px solid var(--line);
+      color: #47574e;
+      font-size: 12px;
+    }
+
+    .formula-label { padding: 0 13px; font-weight: 700; letter-spacing: .04em; }
+    .formula-icon {
+      display: grid;
+      height: 100%;
+      place-items: center;
+      color: var(--green);
+      border-right: 1px solid var(--line);
+      border-left: 1px solid var(--line);
+      font-weight: 800;
+      font-style: italic;
+    }
+    .formula-value {
+      overflow: hidden;
+      padding: 0 14px;
+      color: #34473c;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    main { display: flex; flex: 1; min-height: 0; padding: 18px 24px 24px; }
+
+    .table-wrap {
+      flex: 1;
+      min-height: 0;
+      overflow: auto;
+      border: 1px solid var(--line);
+      border-radius: 9px;
+      box-shadow: 0 2px 6px rgb(22 51 35 / 4%);
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      text-align: left;
+      font-size: 13px;
+    }
+
+    thead { background: #f4f6f5; }
+    th, td { padding: 13px 14px; border-bottom: 1px solid #e8eeea; }
+    th {
+      color: #42534a;
+      font-size: 12px;
+      font-weight: 700;
+      white-space: nowrap;
+    }
+
+    th button {
+      padding: 0;
+      color: inherit;
+      background: none;
+      border: 0;
+      font-weight: inherit;
+      text-align: left;
+    }
+
+    tbody tr:hover { background: #fbfdfb; }
+    tbody tr:last-child td { border-bottom: 0; }
+    .row-number { width: 52px; color: #758279; text-align: center; }
+    .email-cell { color: #17653e; }
+    .vault-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 5px 8px;
+      color: #17653e;
+      background: var(--green-soft);
+      border-radius: 999px;
+      font-size: 11px;
+      font-weight: 700;
+      white-space: nowrap;
+    }
+    .access-reference { display: inline-flex; align-items: center; gap: 5px; }
+    .reference-toggle { width: 32px; min-height: 32px; padding: 0; }
+    .reference-toggle svg { width: 17px; height: 17px; }
+    .row-actions { display: flex; gap: 6px; white-space: nowrap; }
+
+    .empty-state {
+      display: grid;
+      min-height: 300px;
+      place-content: center;
+      justify-items: center;
+      padding: 28px;
+      color: var(--muted);
+      text-align: center;
+    }
+
+    .empty-icon {
+      display: grid;
+      width: 52px;
+      height: 52px;
+      place-items: center;
+      color: var(--green);
+      background: var(--green-soft);
+      border-radius: 15px;
+      font-size: 24px;
+    }
+
+    .empty-state h2 { margin: 14px 0 6px; color: var(--ink); font-size: 16px; }
+    .empty-state p { max-width: 390px; margin: 0; font-size: 13px; line-height: 1.6; }
+
+    .vault-panel {
+      display: flex;
+      flex: 1;
+      min-height: 0;
+      flex-direction: column;
+      gap: 16px;
+      padding: 20px 24px 24px;
+      overflow: auto;
+    }
+
+    .vault-intro {
+      display: flex;
+      align-items: flex-start;
+      gap: 12px;
+      padding: 15px 17px;
+      color: #385344;
+      background: #f1f8f3;
+      border: 1px solid #d9ebdf;
+      border-radius: 9px;
+    }
+
+    .vault-intro strong { display: block; margin-bottom: 4px; color: var(--ink); font-size: 13px; }
+    .vault-intro p { margin: 0; font-size: 12px; line-height: 1.5; }
+    .vault-list { display: grid; gap: 9px; }
+
+    .vault-entry {
+      display: grid;
+      grid-template-columns: minmax(140px, 1fr) minmax(160px, 1.2fr) minmax(150px, 1fr) auto;
+      align-items: center;
+      gap: 14px;
+      padding: 13px 15px;
+      background: #fff;
+      border: 1px solid var(--line);
+      border-radius: 9px;
+    }
+
+    .vault-entry strong, .vault-entry span { display: block; overflow-wrap: anywhere; }
+    .vault-entry strong { margin-bottom: 4px; font-size: 13px; }
+    .vault-entry span { color: var(--muted); font-size: 12px; }
+    .vault-entry .button { justify-self: end; text-decoration: none; }
+    .vault-empty {
+      padding: 42px 20px;
+      color: var(--muted);
+      background: #fbfdfb;
+      border: 1px dashed #cbd8d0;
+      border-radius: 9px;
+      font-size: 13px;
+      text-align: center;
+    }
+
+    .footer {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 11px 24px;
+      color: #fff;
+      background: var(--green);
+      font-size: 12px;
+    }
+
+    .footer-note { color: rgb(255 255 255 / 85%); }
+    .toast { min-height: 1em; text-align: right; }
+
+    dialog {
+      width: min(100% - 32px, 460px);
+      padding: 0;
+      color: var(--ink);
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      box-shadow: 0 22px 70px rgb(16 38 25 / 25%);
+    }
+
+    dialog::backdrop { background: rgb(12 27 18 / 48%); backdrop-filter: blur(2px); }
+    .dialog-content { padding: 24px; }
+    .dialog-content h2 { margin: 0; font-size: 19px; }
+    .dialog-description { margin: 7px 0 20px; color: var(--muted); font-size: 13px; line-height: 1.5; }
+    .field { display: grid; gap: 7px; margin: 15px 0; }
+    .field label { font-size: 12px; font-weight: 700; }
+    .field input {
+      width: 100%;
+      height: 42px;
+      padding: 0 12px;
+      border: 1px solid #cad7cf;
+      border-radius: 7px;
+      font-size: 13px;
+    }
+    .field-hint { color: var(--muted); font-size: 11px; }
+    .dialog-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 22px; }
+    .visually-hidden {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      padding: 0;
+      margin: -1px;
+      overflow: hidden;
+      clip: rect(0, 0, 0, 0);
+      white-space: nowrap;
+      border: 0;
+    }
+
+    @media (max-width: 700px) {
+      .app-shell { width: 100%; height: auto; min-height: 100vh; margin: 0; border-radius: 0; }
+      .topbar { padding: 16px; }
+      .record-count { font-size: 11px; }
+      .tabs { padding: 8px 15px 0; }
+      .toolbar { padding: 13px 15px; }
+      .toolbar .button { flex: 1 1 auto; }
+      .toolbar-spacer { display: none; }
+      .search { width: 100%; }
+      main { padding: 14px; }
+      .table-wrap { flex: auto; min-height: 320px; }
+      .vault-panel { padding: 14px; }
+      .vault-entry { grid-template-columns: 1fr; gap: 8px; }
+      .vault-entry .button { justify-self: start; }
+      .footer { padding: 11px 15px; font-size: 10px; }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after { scroll-behavior: auto !important; transition-duration: .01ms !important; }
+    }
+  </style>
+</head>
+<body>
+  <div class="app-shell">
+    <header class="topbar">
+      <div class="brand">
+        <div class="brand-mark" aria-hidden="true">X</div>
+        <div>
+          <h1>USER EMAIL DIRECTORY</h1>
+          <p>Corporate Access Sheet <span aria-hidden="true">·</span> Secure vault workflow</p>
+        </div>
+      </div>
+      <div class="record-count" id="record-count" aria-live="polite">Total records: 0</div>
+    </header>
+
+    <nav class="tabs" role="tablist" aria-label="Directory sections">
+      <button class="tab-button" id="directory-tab" type="button" role="tab" aria-selected="true" aria-controls="directory-panel">Directory</button>
+      <button class="tab-button" id="passwords-tab" type="button" role="tab" aria-selected="false" aria-controls="passwords-panel">Passwords</button>
+    </nav>
+
+    <section class="toolbar" aria-label="Directory actions">
+      <button class="button button-primary" id="create-button" type="button" data-directory-action>＋ Create a user</button>
+      <button class="button" id="export-button" type="button" data-directory-action>Export CSV</button>
+      <button class="button" id="import-button" type="button" data-directory-action>Import CSV</button>
+      <input class="visually-hidden" id="import-file" type="file" accept=".csv,text/csv">
+      <div class="toolbar-spacer"></div>
+      <label class="search">
+        <span aria-hidden="true">⌕</span>
+        <span class="visually-hidden">Search directory</span>
+        <input id="search-input" type="search" placeholder="Search name or work email" aria-label="Search users and vault references">
+      </label>
+    </section>
+
+    <div class="formula-bar" aria-label="Selected record preview">
+      <span class="formula-label">RECORD</span>
+      <span class="formula-icon" aria-hidden="true">fx</span>
+      <span class="formula-value" id="formula-value">Select a record to preview its directory details</span>
+    </div>
+
+    <main id="directory-panel" role="tabpanel" aria-labelledby="directory-tab">
+      <div class="table-wrap">
+        <table aria-label="User email directory">
+          <thead>
+            <tr>
+              <th class="row-number" scope="col">#</th>
+              <th scope="col"><button type="button" data-sort="name">A — Full name</button></th>
+              <th scope="col"><button type="button" data-sort="email">B — Work email</button></th>
+              <th scope="col">C — Account access</th>
+              <th scope="col"><button type="button" data-sort="createdAt">D — Created</button></th>
+              <th scope="col">E — Actions</th>
+            </tr>
+          </thead>
+          <tbody id="records-body"></tbody>
+        </table>
+      </div>
+    </main>
+
+    <section class="vault-panel" id="passwords-panel" role="tabpanel" aria-labelledby="passwords-tab" hidden>
+      <div class="vault-intro">
+        <span aria-hidden="true">🔒</span>
+        <div>
+          <strong>Passwords stay in your approved password manager</strong>
+          <p>This tab stores only account references and optional HTTPS vault links. It never stores or reveals passwords.</p>
+        </div>
+      </div>
+      <div class="vault-list" id="vault-list" aria-live="polite"></div>
+    </section>
+
+    <footer class="footer">
+      <span class="footer-note">READY <span aria-hidden="true">•</span> Browser-local directory <span aria-hidden="true">•</span> No passwords stored</span>
+      <span class="toast" id="toast" role="status" aria-live="polite">Your directory is ready.</span>
+    </footer>
+  </div>
+
+  <dialog id="user-dialog" aria-labelledby="dialog-title">
+    <form class="dialog-content" id="user-form">
+      <h2 id="dialog-title">Create a user</h2>
+      <p class="dialog-description">Add directory details. Store passwords only in your organization's approved password manager.</p>
+      <div class="field">
+        <label for="name-input">Full name</label>
+        <input id="name-input" name="name" autocomplete="name" maxlength="120" required>
+      </div>
+      <div class="field">
+        <label for="email-input">Work email</label>
+        <input id="email-input" name="email" type="email" autocomplete="email" maxlength="254" required>
+      </div>
+      <div class="field">
+        <label for="access-ref-input">Account access reference (non-secret)</label>
+        <input id="access-ref-input" name="accessRef" maxlength="80" placeholder="e.g. IT-EMAIL-042">
+        <span class="field-hint">Reference name or ID only. Do not enter a password or secret.</span>
+      </div>
+      <div class="field">
+        <label for="vault-url-input">Password manager link (optional)</label>
+        <input id="vault-url-input" name="vaultUrl" type="url" maxlength="2048" placeholder="https://vault.example.com">
+        <span class="field-hint">Use a trusted HTTPS link without passwords, access tokens, or other secrets in its URL.</span>
+      </div>
+      <div class="dialog-actions">
+        <button class="button" type="button" id="cancel-button">Cancel</button>
+        <button class="button button-primary" type="submit" id="save-button">Save user</button>
+      </div>
+    </form>
+  </dialog>
+
+  <script>
+    (() => {
+      "use strict";
+
+      const STORAGE_KEY = "workforce-directory-v1";
+      const CSV_HEADERS = ["name", "email", "accessRef", "vaultUrl", "createdAt"];
+      const body = document.getElementById("records-body");
+      const count = document.getElementById("record-count");
+      const search = document.getElementById("search-input");
+      const formula = document.getElementById("formula-value");
+      const toast = document.getElementById("toast");
+      const userDialog = document.getElementById("user-dialog");
+      const userForm = document.getElementById("user-form");
+      const importFile = document.getElementById("import-file");
+      const vaultList = document.getElementById("vault-list");
+      const directoryPanel = document.getElementById("directory-panel");
+      const passwordsPanel = document.getElementById("passwords-panel");
+      let legacyVaultDataFound = false;
+      let legacyVaultCleanupFailed = false;
+      let records = loadRecords();
+      let editingId = null;
+      let selectedId = null;
+      let sortKey = "createdAt";
+      let sortDirection = "desc";
+      let toastTimer;
+
+      function loadRecords() {
+        try {
+          const value = JSON.parse(localStorage.getItem(STORAGE_KEY) || "[]");
+          if (!Array.isArray(value)) throw new Error("Stored directory data is invalid.");
+          legacyVaultDataFound = value.some((record) =>
+            record && Object.prototype.hasOwnProperty.call(record, "vault")
+          );
+          const normalized = value.filter((record) =>
+            record && typeof record.id === "string" &&
+            typeof record.name === "string" && typeof record.email === "string" &&
+            typeof record.createdAt === "string"
+          ).map((record) => ({
+            id: record.id,
+            name: record.name,
+            email: record.email,
+            accessRef: typeof record.accessRef === "string" ? record.accessRef : "",
+            vaultUrl: typeof record.vaultUrl === "string" ? record.vaultUrl : "",
+            createdAt: record.createdAt
+          }));
+          if (legacyVaultDataFound) {
+            try {
+              localStorage.setItem(STORAGE_KEY, JSON.stringify(normalized));
+            } catch (error) {
+              legacyVaultCleanupFailed = true;
+              console.error("Could not remove legacy free-text vault values from browser storage.", error);
+            }
+          }
+          return normalized;
+        } catch (error) {
+          console.error("Could not load directory records.", error);
+          return [];
+        }
+      }
+
+      function persistRecords() {
+        try {
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(records));
+        } catch (error) {
+          showToast("Could not save. Browser storage may be full or disabled.");
+          throw error;
+        }
+      }
+
+      function showToast(message) {
+        toast.textContent = message;
+        window.clearTimeout(toastTimer);
+        toastTimer = window.setTimeout(() => {
+          toast.textContent = "Your directory is ready.";
+        }, 4000);
+      }
+
+      function el(tag, className, text) {
+        const node = document.createElement(tag);
+        if (className) node.className = className;
+        if (text !== undefined) node.textContent = text;
+        return node;
+      }
+
+      function render() {
+        const query = search.value.trim().toLocaleLowerCase();
+        const visibleRecords = records
+          .filter((record) => `${record.name} ${record.email} ${record.accessRef} ${record.vaultUrl}`.toLocaleLowerCase().includes(query))
+          .sort((a, b) => {
+            const comparison = a[sortKey].localeCompare(b[sortKey], undefined, { sensitivity: "base" });
+            return sortDirection === "asc" ? comparison : -comparison;
+          });
+
+        count.textContent = `Total records: ${records.length}`;
+        body.replaceChildren();
+
+        if (visibleRecords.length === 0) {
+          const row = document.createElement("tr");
+          const cell = document.createElement("td");
+          cell.colSpan = 6;
+          const empty = el("div", "empty-state");
+          empty.append(el("div", "empty-icon", query ? "⌕" : "＋"));
+          empty.append(el("h2", "", query ? "No matching users" : "Your directory is empty"));
+          empty.append(el("p", "", query
+            ? "Try a different name or email, or clear your search."
+            : "Create your first directory entry. Passwords belong in your approved password manager, never in this sheet."));
+          cell.append(empty);
+          row.append(cell);
+          body.append(row);
+          renderVault(query);
+          return;
+        }
+
+        visibleRecords.forEach((record, index) => {
+          const row = document.createElement("tr");
+          row.dataset.id = record.id;
+          row.addEventListener("click", (event) => {
+            if (event.target.closest("button")) return;
+            selectedId = record.id;
+            formula.textContent = `${record.name} | ${record.email}`;
+          });
+
+          row.append(el("td", "row-number", String(index + 1)));
+          row.append(el("td", "", record.name));
+          row.append(el("td", "email-cell", record.email));
+
+          const accessCell = document.createElement("td");
+          accessCell.append(createAccessReference(record));
+          const safeVaultUrl = validateVaultUrl(record.vaultUrl);
+          if (safeVaultUrl) {
+            accessCell.append(createVaultLink(safeVaultUrl));
+          } else {
+            accessCell.append(el("span", "vault-badge", "No vault link"));
+          }
+          row.append(accessCell);
+          row.append(el("td", "", formatDate(record.createdAt)));
+
+          const actionsCell = document.createElement("td");
+          const actions = el("div", "row-actions");
+          const editButton = el("button", "button button-small", "Edit");
+          editButton.type = "button";
+          editButton.setAttribute("aria-label", `Edit ${record.name}`);
+          editButton.addEventListener("click", () => openUserDialog(record));
+          const deleteButton = el("button", "button button-small button-danger", "Delete");
+          deleteButton.type = "button";
+          deleteButton.setAttribute("aria-label", `Delete ${record.name}`);
+          deleteButton.addEventListener("click", () => deleteRecord(record));
+          actions.append(editButton, deleteButton);
+          actionsCell.append(actions);
+          row.append(actionsCell);
+          body.append(row);
+        });
+        renderVault(query);
+      }
+
+      function renderVault(query) {
+        vaultList.replaceChildren();
+        const matchingRecords = records.filter((record) =>
+          `${record.name} ${record.email} ${record.accessRef} ${record.vaultUrl}`.toLocaleLowerCase().includes(query)
+        );
+        if (matchingRecords.length === 0) {
+          vaultList.append(el("div", "vault-empty", query
+            ? "No matching vault references. Try another search."
+            : "No users yet. Add a directory entry to create a vault reference."));
+          return;
+        }
+
+        matchingRecords.forEach((record) => {
+          const entry = el("article", "vault-entry");
+          const person = document.createElement("div");
+          person.append(el("strong", "", record.name));
+          person.append(el("span", "", record.email));
+          const vault = document.createElement("div");
+          vault.append(el("strong", "", "Account access reference"));
+          vault.append(createAccessReference(record));
+          const protection = document.createElement("div");
+          protection.append(el("strong", "", "Credential status"));
+          protection.append(el("span", "", "Not stored in this directory"));
+
+          const safeVaultUrl = validateVaultUrl(record.vaultUrl);
+          vault.append(el("span", "", safeVaultUrl ? "Available" : "Not configured"));
+          entry.append(person, vault, protection);
+          if (safeVaultUrl) {
+            entry.append(createVaultLink(safeVaultUrl));
+          } else {
+            const editButton = el("button", "button button-small", "Add vault link");
+            editButton.type = "button";
+            editButton.addEventListener("click", () => openUserDialog(record));
+            entry.append(editButton);
+          }
+          vaultList.append(entry);
+        });
+      }
+
+      function createVaultLink(url) {
+        const link = el("a", "button button-small", "Open vault ↗");
+        link.href = url;
+        link.target = "_blank";
+        link.rel = "noopener noreferrer";
+        return link;
+      }
+
+      function createAccessReference(record) {
+        if (!record.accessRef) return el("span", "vault-badge", "No reference");
+
+        const container = el("div", "access-reference");
+        const value = el("span", "", "••••••••");
+        const button = el("button", "button button-small reference-toggle");
+        button.type = "button";
+        button.setAttribute("aria-label", `Show account access reference for ${record.name}`);
+        button.title = "Show non-secret account access reference";
+        button.setAttribute("aria-pressed", "false");
+
+        const icon = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+        icon.setAttribute("viewBox", "0 0 24 24");
+        icon.setAttribute("fill", "none");
+        icon.setAttribute("stroke", "currentColor");
+        icon.setAttribute("stroke-width", "1.8");
+        icon.setAttribute("stroke-linecap", "round");
+        icon.setAttribute("stroke-linejoin", "round");
+        icon.setAttribute("aria-hidden", "true");
+        const outline = document.createElementNS("http://www.w3.org/2000/svg", "path");
+        outline.setAttribute("d", "M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12Z");
+        const pupil = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+        pupil.setAttribute("cx", "12");
+        pupil.setAttribute("cy", "12");
+        pupil.setAttribute("r", "3");
+        icon.append(outline, pupil);
+        button.append(icon);
+        let visible = false;
+        button.addEventListener("click", () => {
+          visible = !visible;
+          value.textContent = visible ? record.accessRef : "••••••••";
+          button.setAttribute("aria-label", `${visible ? "Hide" : "Show"} account access reference for ${record.name}`);
+          button.setAttribute("aria-pressed", String(visible));
+        });
+        container.append(value, button);
+        return container;
+      }
+
+      function formatDate(value) {
+        const date = new Date(value);
+        return Number.isNaN(date.getTime()) ? value : new Intl.DateTimeFormat(undefined, {
+          year: "numeric", month: "short", day: "numeric"
+        }).format(date);
+      }
+
+      function openUserDialog(record) {
+        editingId = record ? record.id : null;
+        document.getElementById("dialog-title").textContent = record ? "Edit user" : "Create a user";
+        document.getElementById("save-button").textContent = record ? "Save changes" : "Save user";
+        userForm.elements.name.value = record ? record.name : "";
+        userForm.elements.email.value = record ? record.email : "";
+        userForm.elements.accessRef.value = record ? record.accessRef : "";
+        userForm.elements.vaultUrl.value = record ? record.vaultUrl : "";
+        userDialog.showModal();
+        document.getElementById("name-input").focus();
+      }
+
+      function validateVaultUrl(value) {
+        if (!value) return "";
+        try {
+          const url = new URL(value);
+          if (url.protocol !== "https:" || !url.hostname || url.username || url.password || url.search || url.hash) return null;
+          return url.href;
+        } catch {
+          return null;
+        }
+      }
+
+      function normalizeEmail(email) {
+        return email.trim().toLocaleLowerCase();
+      }
+
+      function saveUser(event) {
+        event.preventDefault();
+        const name = userForm.elements.name.value.trim();
+        const email = userForm.elements.email.value.trim();
+        const accessRef = userForm.elements.accessRef.value.trim();
+        const vaultUrlInput = userForm.elements.vaultUrl.value.trim();
+        const vaultUrl = validateVaultUrl(vaultUrlInput);
+        if (vaultUrl === null || name.length > 120 || email.length > 254 || accessRef.length > 80) {
+          showToast("Use valid directory details and a trusted HTTPS vault link without query strings or secrets.");
+          userForm.elements.vaultUrl.focus();
+          return;
+        }
+        const duplicate = records.find((record) =>
+          normalizeEmail(record.email) === normalizeEmail(email) && record.id !== editingId
+        );
+        if (duplicate) {
+          showToast("A user with that work email already exists.");
+          userForm.elements.email.focus();
+          return;
+        }
+
+        const previousRecords = records;
+        if (editingId) {
+          records = records.map((record) => record.id === editingId
+            ? { ...record, name, email, accessRef, vaultUrl }
+            : record);
+        } else {
+          records = [...records, {
+            id: crypto.randomUUID(),
+            name,
+            email,
+            accessRef,
+            vaultUrl,
+            createdAt: new Date().toISOString()
+          }];
+        }
+
+        try {
+          persistRecords();
+        } catch {
+          records = previousRecords;
+          return;
+        }
+        selectedId = editingId || records[records.length - 1].id;
+        userDialog.close();
+        userForm.reset();
+        render();
+        showToast(editingId ? "User updated." : "User created.");
+      }
+
+      function deleteRecord(record) {
+        if (!window.confirm(`Delete ${record.name} from this directory?`)) return;
+        const previousRecords = records;
+        records = records.filter((item) => item.id !== record.id);
+        try {
+          persistRecords();
+        } catch {
+          records = previousRecords;
+          return;
+        }
+        if (selectedId === record.id) {
+          selectedId = null;
+          formula.textContent = "Select a record to preview its directory details";
+        }
+        render();
+        showToast("User deleted.");
+      }
+
+      function csvCell(value) {
+        let safeValue = String(value ?? "");
+        if (/^[\s]*[=+\-@]/.test(safeValue)) safeValue = `'${safeValue}`;
+        return `"${safeValue.replaceAll('"', '""')}"`;
+      }
+
+      function exportCsv() {
+        const rows = [CSV_HEADERS, ...records.map((record) => CSV_HEADERS.map((key) => record[key] || ""))];
+        const content = "\uFEFF" + rows.map((row) => row.map(csvCell).join(",")).join("\r\n");
+        const url = URL.createObjectURL(new Blob([content], { type: "text/csv;charset=utf-8" }));
+        const anchor = document.createElement("a");
+        anchor.href = url;
+        anchor.download = "user-directory.csv";
+        anchor.click();
+        URL.revokeObjectURL(url);
+        showToast("Directory CSV exported. Passwords are never included.");
+      }
+
+      function parseCsv(text) {
+        const rows = [];
+        let row = [];
+        let cell = "";
+        let quoted = false;
+        for (let index = 0; index < text.length; index += 1) {
+          const character = text[index];
+          if (quoted) {
+            if (character === '"' && text[index + 1] === '"') {
+              cell += '"';
+              index += 1;
+            } else if (character === '"') {
+              quoted = false;
+            } else {
+              cell += character;
+            }
+          } else if (character === '"' && cell.length === 0) {
+            quoted = true;
+          } else if (character === ",") {
+            row.push(cell);
+            cell = "";
+          } else if (character === "\n" || character === "\r") {
+            if (character === "\r" && text[index + 1] === "\n") index += 1;
+            row.push(cell);
+            if (row.some((value) => value !== "")) rows.push(row);
+            row = [];
+            cell = "";
+          } else {
+            cell += character;
+          }
+        }
+        if (quoted) throw new Error("The CSV contains an unclosed quoted field.");
+        row.push(cell);
+        if (row.some((value) => value !== "")) rows.push(row);
+        return rows;
+      }
+
+      async function importCsv(file) {
+        const text = (await file.text()).replace(/^\uFEFF/, "");
+        const rows = parseCsv(text);
+        if (rows.length < 1) throw new Error("The CSV file is empty.");
+        const headers = rows[0].map((header) => header.trim().toLocaleLowerCase());
+        const forbidden = headers.filter((header) => /password|passphrase|secret|token|credential|recovery|private.?key/.test(header));
+        if (forbidden.length) {
+          throw new Error("This directory does not import passwords, tokens, or other credentials.");
+        }
+        const supportedHeaders = new Set(CSV_HEADERS.map((header) => header.toLocaleLowerCase()));
+        const unsupported = headers.filter((header) => !supportedHeaders.has(header));
+        if (unsupported.length || new Set(headers).size !== headers.length) {
+          throw new Error("CSV contains unsupported or duplicate columns. Allowed columns: name, email, accessRef, vaultUrl, createdAt.");
+        }
+        const nameIndex = headers.indexOf("name");
+        const emailIndex = headers.indexOf("email");
+        if (nameIndex < 0 || emailIndex < 0) {
+          throw new Error("CSV must include name and email columns. Optional columns: accessRef, vaultUrl, createdAt.");
+        }
+
+        const imported = rows.slice(1).map((cells, index) => {
+          if (cells.length !== headers.length) {
+            throw new Error(`The number of fields does not match the CSV headers on row ${index + 2}.`);
+          }
+          const name = (cells[nameIndex] || "").trim();
+          const email = (cells[emailIndex] || "").trim();
+          const accessRef = (cells[headers.indexOf("accessref")] || "").trim();
+          const vaultUrlInput = (cells[headers.indexOf("vaulturl")] || "").trim();
+          const vaultUrl = validateVaultUrl(vaultUrlInput);
+          if (!name || name.length > 120 || !email || email.length > 254 ||
+              accessRef.length > 80 || vaultUrl === null ||
+              !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+            throw new Error(`Invalid details or unsafe vault link on CSV row ${index + 2}.`);
+          }
+          return {
+            id: crypto.randomUUID(),
+            name,
+            email,
+            accessRef,
+            vaultUrl,
+            createdAt: (cells[headers.indexOf("createdat")] || "").trim() || new Date().toISOString()
+          };
+        });
+
+        const merged = [...records];
+        for (const record of imported) {
+          const existingIndex = merged.findIndex((current) =>
+            normalizeEmail(current.email) === normalizeEmail(record.email)
+          );
+          if (existingIndex >= 0) merged[existingIndex] = { ...merged[existingIndex], ...record };
+          else merged.push(record);
+        }
+        const previousRecords = records;
+        records = merged;
+        try {
+          persistRecords();
+        } catch (error) {
+          records = previousRecords;
+          throw error;
+        }
+        render();
+        showToast(`Imported ${imported.length} user${imported.length === 1 ? "" : "s"}.`);
+      }
+
+      document.getElementById("create-button").addEventListener("click", () => openUserDialog(null));
+      document.getElementById("cancel-button").addEventListener("click", () => userDialog.close());
+      document.getElementById("export-button").addEventListener("click", exportCsv);
+      document.getElementById("import-button").addEventListener("click", () => importFile.click());
+      document.getElementById("directory-tab").addEventListener("click", () => setActiveTab("directory"));
+      document.getElementById("passwords-tab").addEventListener("click", () => setActiveTab("passwords"));
+      search.addEventListener("input", render);
+      document.querySelectorAll("[data-sort]").forEach((button) => {
+        button.addEventListener("click", () => {
+          const key = button.dataset.sort;
+          sortDirection = sortKey === key && sortDirection === "asc" ? "desc" : "asc";
+          sortKey = key;
+          render();
+        });
+      });
+      userForm.addEventListener("submit", saveUser);
+      importFile.addEventListener("change", async () => {
+        const [file] = importFile.files || [];
+        if (!file) return;
+        try {
+          await importCsv(file);
+        } catch (error) {
+          console.error("Could not import directory CSV.", error);
+          showToast(error.message || "Could not import CSV.");
+        } finally {
+          importFile.value = "";
+        }
+      });
+
+      render();
+      if (legacyVaultCleanupFailed) {
+        showToast("Could not clear old vault text from browser storage.");
+      } else if (legacyVaultDataFound) {
+        showToast("Old free-text vault values were removed. Add a password-manager link instead.");
+      }
+
+      function setActiveTab(tab) {
+        const isDirectory = tab === "directory";
+        directoryPanel.hidden = !isDirectory;
+        passwordsPanel.hidden = isDirectory;
+        document.getElementById("directory-tab").setAttribute("aria-selected", String(isDirectory));
+        document.getElementById("passwords-tab").setAttribute("aria-selected", String(!isDirectory));
+        document.querySelectorAll("[data-directory-action]").forEach((button) => {
+          button.hidden = !isDirectory;
+        });
+        search.placeholder = isDirectory ? "Search name or work email" : "Search users and vault references";
+      }
+    })();
+  </script>
+</body>
+</html>

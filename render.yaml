@@ -1,0 +1,6 @@
+services:
+  - type: web
+    name: user-email-directory
+    runtime: static
+    buildCommand: "echo Static site"
+    staticPublishPath: .
