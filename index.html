@@ -97,6 +97,32 @@
       color: rgb(255 255 255 / 90%);
     }
 
+    .topbar-actions { display: flex; align-items: center; gap: 16px; }
+    .signed-in-email { color: rgb(255 255 255 / 78%); font-size: 12px; }
+
+    .auth-panel {
+      display: grid;
+      min-height: 100vh;
+      padding: 24px;
+      place-items: center;
+      background: #f2f5f3;
+    }
+
+    .auth-card {
+      width: min(100%, 440px);
+      padding: 30px;
+      background: #fff;
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      box-shadow: 0 16px 48px rgb(22 51 35 / 10%);
+    }
+
+    .auth-card h1 { margin: 20px 0 0; font-size: 20px; letter-spacing: -.025em; }
+    .auth-card .dialog-description { margin-bottom: 20px; }
+    .auth-card .button { width: 100%; justify-content: center; }
+    .auth-status { min-height: 20px; margin: 14px 0 0; color: var(--muted); font-size: 13px; line-height: 1.5; }
+    .auth-status[data-error="true"] { color: #a93636; }
+
     .toolbar {
       display: flex;
       flex-wrap: wrap;
@@ -401,6 +427,7 @@
     @media (max-width: 700px) {
       .app-shell { width: 100%; height: auto; min-height: 100vh; margin: 0; border-radius: 0; }
       .topbar { padding: 16px; }
+      .topbar-actions { align-items: flex-end; flex-direction: column; gap: 7px; }
       .record-count { font-size: 11px; }
       .tabs { padding: 8px 15px 0; }
       .toolbar { padding: 13px 15px; }
@@ -421,7 +448,24 @@
   </style>
 </head>
 <body>
-  <div class="app-shell">
+  <section class="auth-panel" id="auth-panel" aria-labelledby="auth-title">
+    <div class="auth-card">
+      <div class="brand-mark" aria-hidden="true">X</div>
+      <h1 id="auth-title">USER EMAIL DIRECTORY</h1>
+      <p class="dialog-description">Sign in with your invited work email. We’ll send you a secure, one-time sign-in link.</p>
+      <form id="auth-form">
+        <div class="field">
+          <label for="auth-email">Work email</label>
+          <input id="auth-email" name="email" type="email" autocomplete="email" maxlength="254" required>
+        </div>
+        <button class="button button-primary" id="auth-submit" type="submit">Send sign-in link</button>
+      </form>
+      <p class="auth-status" id="auth-status" role="status" aria-live="polite"></p>
+      <p class="field-hint">Only authorized members can access this directory. Passwords are never stored here.</p>
+    </div>
+  </section>
+
+  <div class="app-shell" id="app-shell" hidden>
     <header class="topbar">
       <div class="brand">
         <div class="brand-mark" aria-hidden="true">X</div>
@@ -430,7 +474,11 @@
           <p>Corporate Access Sheet <span aria-hidden="true">·</span> Secure vault workflow</p>
         </div>
       </div>
-      <div class="record-count" id="record-count" aria-live="polite">Total records: 0</div>
+      <div class="topbar-actions">
+        <span class="signed-in-email" id="signed-in-email"></span>
+        <button class="button button-small" id="signout-button" type="button">Sign out</button>
+        <div class="record-count" id="record-count" aria-live="polite">Total records: 0</div>
+      </div>
     </header>
 
     <nav class="tabs" role="tablist" aria-label="Directory sections">
@@ -487,7 +535,7 @@
     </section>
 
     <footer class="footer">
-      <span class="footer-note">READY <span aria-hidden="true">•</span> Browser-local directory <span aria-hidden="true">•</span> No passwords stored</span>
+      <span class="footer-note">CLOUD-SAVED <span aria-hidden="true">•</span> Supabase synchronized <span aria-hidden="true">•</span> No passwords stored</span>
       <span class="toast" id="toast" role="status" aria-live="polite">Your directory is ready.</span>
     </footer>
   </div>
@@ -521,6 +569,8 @@
     </form>
   </dialog>
 
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="supabase-config.js"></script>
   <script>
     (() => {
       "use strict";
@@ -538,56 +588,57 @@
       const vaultList = document.getElementById("vault-list");
       const directoryPanel = document.getElementById("directory-panel");
       const passwordsPanel = document.getElementById("passwords-panel");
+      const authPanel = document.getElementById("auth-panel");
+      const appShell = document.getElementById("app-shell");
+      const authForm = document.getElementById("auth-form");
+      const authEmail = document.getElementById("auth-email");
+      const authSubmit = document.getElementById("auth-submit");
+      const authStatus = document.getElementById("auth-status");
+      const signedInEmail = document.getElementById("signed-in-email");
+      const signOutButton = document.getElementById("signout-button");
       let legacyVaultDataFound = false;
-      let legacyVaultCleanupFailed = false;
-      let records = loadRecords();
+      let records = [];
       let editingId = null;
       let selectedId = null;
       let sortKey = "createdAt";
       let sortDirection = "desc";
       let toastTimer;
+      let supabaseClient = null;
+      let activeUserId = null;
 
-      function loadRecords() {
+      function loadLocalRecords() {
+        const stored = localStorage.getItem(STORAGE_KEY);
+        if (stored === null) return [];
+        let value;
         try {
-          const value = JSON.parse(localStorage.getItem(STORAGE_KEY) || "[]");
-          if (!Array.isArray(value)) throw new Error("Stored directory data is invalid.");
-          legacyVaultDataFound = value.some((record) =>
-            record && Object.prototype.hasOwnProperty.call(record, "vault")
-          );
-          const normalized = value.filter((record) =>
-            record && typeof record.id === "string" &&
-            typeof record.name === "string" && typeof record.email === "string" &&
-            typeof record.createdAt === "string"
-          ).map((record) => ({
-            id: record.id,
-            name: record.name,
-            email: record.email,
-            accessRef: typeof record.accessRef === "string" ? record.accessRef : "",
-            vaultUrl: typeof record.vaultUrl === "string" ? record.vaultUrl : "",
-            createdAt: record.createdAt
-          }));
-          if (legacyVaultDataFound) {
-            try {
-              localStorage.setItem(STORAGE_KEY, JSON.stringify(normalized));
-            } catch (error) {
-              legacyVaultCleanupFailed = true;
-              console.error("Could not remove legacy free-text vault values from browser storage.", error);
-            }
-          }
-          return normalized;
+          value = JSON.parse(stored);
         } catch (error) {
-          console.error("Could not load directory records.", error);
-          return [];
+          throw new Error("Local directory data could not be read. Export or repair the browser data before signing in.", { cause: error });
         }
-      }
+        if (!Array.isArray(value)) throw new Error("Local directory data is not a valid record list; migration was stopped.");
 
-      function persistRecords() {
-        try {
-          localStorage.setItem(STORAGE_KEY, JSON.stringify(records));
-        } catch (error) {
-          showToast("Could not save. Browser storage may be full or disabled.");
-          throw error;
+        legacyVaultDataFound = value.some((record) =>
+          record && Object.prototype.hasOwnProperty.call(record, "vault")
+        );
+        const normalized = value.filter((record) =>
+          record && typeof record.id === "string" &&
+          typeof record.name === "string" && typeof record.email === "string" &&
+          typeof record.createdAt === "string"
+        ).map((record) => ({
+          id: record.id,
+          name: record.name,
+          email: record.email,
+          accessRef: typeof record.accessRef === "string" ? record.accessRef : "",
+          vaultUrl: typeof record.vaultUrl === "string" ? record.vaultUrl : "",
+          createdAt: record.createdAt
+        }));
+        if (normalized.length !== value.length) {
+          throw new Error("Some local directory entries are invalid; migration was stopped to avoid losing data.");
         }
+        if (legacyVaultDataFound) {
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(normalized));
+        }
+        return normalized;
       }
 
       function showToast(message) {
@@ -596,6 +647,11 @@
         toastTimer = window.setTimeout(() => {
           toast.textContent = "Your directory is ready.";
         }, 4000);
+      }
+
+      function setAuthStatus(message, isError = false) {
+        authStatus.textContent = message;
+        authStatus.dataset.error = String(isError);
       }
 
       function el(tag, className, text) {
@@ -795,7 +851,196 @@
         return email.trim().toLocaleLowerCase();
       }
 
-      function saveUser(event) {
+      function fromDatabaseRecord(record) {
+        return {
+          id: record.id,
+          name: record.name,
+          email: record.email,
+          accessRef: record.access_ref,
+          vaultUrl: record.vault_url,
+          createdAt: record.created_at
+        };
+      }
+
+      function toDatabaseRecord(record) {
+        return {
+          id: record.id,
+          name: record.name,
+          email: record.email,
+          access_ref: record.accessRef,
+          vault_url: record.vaultUrl,
+          created_at: record.createdAt
+        };
+      }
+
+      async function loadCloudRecords() {
+        const { data, error } = await supabaseClient
+          .from("directory_records")
+          .select("id, name, email, access_ref, vault_url, created_at")
+          .order("created_at", { ascending: false });
+        if (error) throw error;
+        return data.map(fromDatabaseRecord);
+      }
+
+      async function migrateLocalRecords() {
+        const localRecords = loadLocalRecords();
+        const emails = new Set();
+        for (const record of localRecords) {
+          const email = normalizeEmail(record.email);
+          if (emails.has(email)) throw new Error("Duplicate work emails were found in local data; migration was stopped.");
+          emails.add(email);
+        }
+
+        if (localRecords.length) {
+          const { data, error } = await supabaseClient
+            .from("directory_records")
+            .select("id, email");
+          if (error) throw error;
+          const existingIds = new Set(data.map((record) => record.id));
+          const existingEmails = new Set(data.map((record) => normalizeEmail(record.email)));
+          const pending = localRecords.filter((record) =>
+            !existingIds.has(record.id) && !existingEmails.has(normalizeEmail(record.email))
+          );
+          if (pending.length) {
+            const { error: insertError } = await supabaseClient
+              .from("directory_records")
+              .insert(pending.map(toDatabaseRecord));
+            if (insertError) throw insertError;
+          }
+          return pending.length;
+        }
+        return 0;
+      }
+
+      async function signOutAfterAccessFailure(message) {
+        activeUserId = null;
+        appShell.hidden = true;
+        authPanel.hidden = false;
+        setAuthStatus(message, true);
+        try {
+          const { error } = await supabaseClient.auth.signOut();
+          if (error) throw error;
+        } catch (error) {
+          console.error("Could not clear the unauthorized session.", error);
+          setAuthStatus(`${message} Sign out failed: ${error.message || "please clear the browser session."}`, true);
+        }
+      }
+
+      async function handleAuthSession(session) {
+        if (!session) {
+          activeUserId = null;
+          records = [];
+          body.replaceChildren();
+          vaultList.replaceChildren();
+          signedInEmail.textContent = "";
+          appShell.hidden = true;
+          authPanel.hidden = false;
+          return;
+        }
+        if (activeUserId === session.user.id) return;
+
+        activeUserId = session.user.id;
+        setAuthStatus("Checking access and loading your directory...");
+        const email = normalizeEmail(session.user.email || "");
+        try {
+          if (!email) throw new Error("The signed-in account does not have a verified email address.");
+          const { data: member, error } = await supabaseClient
+            .from("directory_members")
+            .select("email")
+            .eq("email", email)
+            .maybeSingle();
+          if (error) throw error;
+          if (!member) {
+            await signOutAfterAccessFailure("This email is not authorized to access the directory.");
+            return;
+          }
+
+          const migratedCount = await migrateLocalRecords();
+          records = await loadCloudRecords();
+          signedInEmail.textContent = email;
+          appShell.hidden = false;
+          authPanel.hidden = true;
+          setAuthStatus("");
+          render();
+          if (migratedCount) {
+            showToast(`Migrated ${migratedCount} local user${migratedCount === 1 ? "" : "s"} to Supabase.`);
+          } else if (legacyVaultDataFound) {
+            showToast("Old free-text vault values were removed. Add a password-manager link instead.");
+          }
+        } catch (error) {
+          console.error("Could not authorize or load directory records.", error);
+          await signOutAfterAccessFailure(`Could not load the directory: ${error.message || "Please try again."}`);
+        }
+      }
+
+      function initializeSupabase() {
+        const config = window.DIRECTORY_SUPABASE_CONFIG;
+        if (!window.supabase?.createClient || !config?.url || !config?.publishableKey) {
+          setAuthStatus("Supabase is not configured. Check the directory setup.", true);
+          return;
+        }
+        supabaseClient = window.supabase.createClient(config.url, config.publishableKey);
+        supabaseClient.auth.onAuthStateChange((_event, session) => {
+          window.setTimeout(() => {
+            handleAuthSession(session).catch((error) => {
+              console.error("Could not handle the sign-in session.", error);
+              setAuthStatus(`Could not load the directory: ${error.message || "Please try again."}`, true);
+            });
+          }, 0);
+        });
+        supabaseClient.auth.getSession().then(({ data, error }) => {
+          if (error) throw error;
+          return handleAuthSession(data.session);
+        }).catch((error) => {
+          console.error("Could not restore the sign-in session.", error);
+          setAuthStatus(`Could not restore your sign-in: ${error.message || "Please sign in again."}`, true);
+        });
+      }
+
+      authForm.addEventListener("submit", async (event) => {
+        event.preventDefault();
+        if (!supabaseClient) {
+          setAuthStatus("Supabase is not configured. Check the directory setup.", true);
+          return;
+        }
+        authSubmit.disabled = true;
+        setAuthStatus("Sending your sign-in link...");
+        try {
+          const redirectUrl = new URL(window.location.href);
+          redirectUrl.search = "";
+          redirectUrl.hash = "";
+          const { error } = await supabaseClient.auth.signInWithOtp({
+            email: normalizeEmail(authEmail.value),
+            options: {
+              emailRedirectTo: redirectUrl.href,
+              shouldCreateUser: false
+            }
+          });
+          if (error) throw error;
+          setAuthStatus("If this email is authorized, a sign-in link will arrive shortly.");
+        } catch (error) {
+          console.error("Could not send the sign-in link.", error);
+          setAuthStatus(`Could not send the sign-in link: ${error.message || "Please try again."}`, true);
+        } finally {
+          authSubmit.disabled = false;
+        }
+      });
+
+      signOutButton.addEventListener("click", async () => {
+        signOutButton.disabled = true;
+        try {
+          const { error } = await supabaseClient.auth.signOut();
+          if (error) throw error;
+          setAuthStatus("You have signed out.");
+        } catch (error) {
+          console.error("Could not sign out.", error);
+          showToast(`Could not sign out: ${error.message || "Please try again."}`);
+        } finally {
+          signOutButton.disabled = false;
+        }
+      });
+
+      async function saveUser(event) {
         event.preventDefault();
         const name = userForm.elements.name.value.trim();
         const email = userForm.elements.email.value.trim();
@@ -816,51 +1061,72 @@
           return;
         }
 
-        const previousRecords = records;
-        if (editingId) {
-          records = records.map((record) => record.id === editingId
-            ? { ...record, name, email, accessRef, vaultUrl }
-            : record);
-        } else {
-          records = [...records, {
-            id: crypto.randomUUID(),
+        const saveButton = document.getElementById("save-button");
+        saveButton.disabled = true;
+        try {
+          const current = editingId ? records.find((record) => record.id === editingId) : null;
+          const candidate = {
+            ...(current || {}),
             name,
             email,
             accessRef,
             vaultUrl,
-            createdAt: new Date().toISOString()
-          }];
+            createdAt: current?.createdAt || new Date().toISOString()
+          };
+          const query = supabaseClient.from("directory_records");
+          const result = editingId
+            ? await query.update({
+              name: candidate.name,
+              email: candidate.email,
+              access_ref: candidate.accessRef,
+              vault_url: candidate.vaultUrl
+            }).eq("id", editingId).select("id, name, email, access_ref, vault_url, created_at").single()
+            : await query.insert(toDatabaseRecord({ ...candidate, id: crypto.randomUUID() }))
+              .select("id, name, email, access_ref, vault_url, created_at").single();
+          if (result.error) {
+            if (result.error.code === "23505") {
+              showToast("A user with that work email already exists.");
+              userForm.elements.email.focus();
+              return;
+            }
+            throw result.error;
+          }
+          const saved = fromDatabaseRecord(result.data);
+          records = editingId
+            ? records.map((record) => record.id === editingId ? saved : record)
+            : [...records, saved];
+          selectedId = saved.id;
+          userDialog.close();
+          userForm.reset();
+          render();
+          showToast(editingId ? "User updated." : "User created.");
+        } catch (error) {
+          console.error("Could not save the directory record.", error);
+          showToast(`Could not save user: ${error.message || "Please try again."}`);
+        } finally {
+          saveButton.disabled = false;
         }
-
-        try {
-          persistRecords();
-        } catch {
-          records = previousRecords;
-          return;
-        }
-        selectedId = editingId || records[records.length - 1].id;
-        userDialog.close();
-        userForm.reset();
-        render();
-        showToast(editingId ? "User updated." : "User created.");
       }
 
-      function deleteRecord(record) {
+      async function deleteRecord(record) {
         if (!window.confirm(`Delete ${record.name} from this directory?`)) return;
-        const previousRecords = records;
-        records = records.filter((item) => item.id !== record.id);
         try {
-          persistRecords();
-        } catch {
-          records = previousRecords;
-          return;
+          const { error } = await supabaseClient
+            .from("directory_records")
+            .delete()
+            .eq("id", record.id);
+          if (error) throw error;
+          records = records.filter((item) => item.id !== record.id);
+          if (selectedId === record.id) {
+            selectedId = null;
+            formula.textContent = "Select a record to preview its directory details";
+          }
+          render();
+          showToast("User deleted.");
+        } catch (error) {
+          console.error("Could not delete the directory record.", error);
+          showToast(`Could not delete user: ${error.message || "Please try again."}`);
         }
-        if (selectedId === record.id) {
-          selectedId = null;
-          formula.textContent = "Select a record to preview its directory details";
-        }
-        render();
-        showToast("User deleted.");
       }
 
       function csvCell(value) {
@@ -962,22 +1228,28 @@
           };
         });
 
-        const merged = [...records];
+        const mergedByEmail = new Map(records.map((record) => [normalizeEmail(record.email), record]));
+        const writesById = new Map();
         for (const record of imported) {
-          const existingIndex = merged.findIndex((current) =>
-            normalizeEmail(current.email) === normalizeEmail(record.email)
-          );
-          if (existingIndex >= 0) merged[existingIndex] = { ...merged[existingIndex], ...record };
-          else merged.push(record);
+          const existing = mergedByEmail.get(normalizeEmail(record.email));
+          const merged = existing
+            ? { ...existing, ...record, id: existing.id }
+            : record;
+          mergedByEmail.set(normalizeEmail(record.email), merged);
+          writesById.set(merged.id, merged);
         }
-        const previousRecords = records;
-        records = merged;
-        try {
-          persistRecords();
-        } catch (error) {
-          records = previousRecords;
-          throw error;
-        }
+        const { data, error } = await supabaseClient
+          .from("directory_records")
+          .upsert([...writesById.values()].map(toDatabaseRecord), { onConflict: "id" })
+          .select("id, name, email, access_ref, vault_url, created_at");
+        if (error) throw error;
+        const savedRecords = data.map(fromDatabaseRecord);
+        const savedById = new Map(savedRecords.map((record) => [record.id, record]));
+        const existingIds = new Set(records.map((record) => record.id));
+        records = records.map((record) => savedById.get(record.id) || record);
+        savedRecords.forEach((record) => {
+          if (!existingIds.has(record.id)) records.push(record);
+        });
         render();
         showToast(`Imported ${imported.length} user${imported.length === 1 ? "" : "s"}.`);
       }
@@ -1011,12 +1283,7 @@
         }
       });
 
-      render();
-      if (legacyVaultCleanupFailed) {
-        showToast("Could not clear old vault text from browser storage.");
-      } else if (legacyVaultDataFound) {
-        showToast("Old free-text vault values were removed. Add a password-manager link instead.");
-      }
+      initializeSupabase();
 
       function setActiveTab(tab) {
         const isDirectory = tab === "directory";
