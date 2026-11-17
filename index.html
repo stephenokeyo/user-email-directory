@@ -452,13 +452,17 @@
     <div class="auth-card">
       <div class="brand-mark" aria-hidden="true">X</div>
       <h1 id="auth-title">USER EMAIL DIRECTORY</h1>
-      <p class="dialog-description">Sign in with your invited work email. We’ll send you a secure, one-time sign-in link.</p>
+      <p class="dialog-description">Sign in with your invited work email and the shared directory password.</p>
       <form id="auth-form">
         <div class="field">
           <label for="auth-email">Work email</label>
           <input id="auth-email" name="email" type="email" autocomplete="email" maxlength="254" required>
         </div>
-        <button class="button button-primary" id="auth-submit" type="submit">Send sign-in link</button>
+        <div class="field">
+          <label for="auth-password">Shared password</label>
+          <input id="auth-password" name="password" type="password" autocomplete="current-password" required>
+        </div>
+        <button class="button button-primary" id="auth-submit" type="submit">Access directory</button>
       </form>
       <p class="auth-status" id="auth-status" role="status" aria-live="polite"></p>
       <p class="field-hint">Only authorized members can access this directory. Passwords are never stored here.</p>
@@ -1004,23 +1008,16 @@
           return;
         }
         authSubmit.disabled = true;
-        setAuthStatus("Sending your sign-in link...");
+        setAuthStatus("Signing in...");
         try {
-          const redirectUrl = new URL(window.location.href);
-          redirectUrl.search = "";
-          redirectUrl.hash = "";
-          const { error } = await supabaseClient.auth.signInWithOtp({
+          const { error } = await supabaseClient.auth.signInWithPassword({
             email: normalizeEmail(authEmail.value),
-            options: {
-              emailRedirectTo: redirectUrl.href,
-              shouldCreateUser: false
-            }
+            password: document.getElementById("auth-password").value
           });
           if (error) throw error;
-          setAuthStatus("If this email is authorized, a sign-in link will arrive shortly.");
         } catch (error) {
-          console.error("Could not send the sign-in link.", error);
-          setAuthStatus(`Could not send the sign-in link: ${error.message || "Please try again."}`, true);
+          console.error("Could not sign in.", error);
+          setAuthStatus(`Could not sign in: ${error.message || "Please check your email and password."}`, true);
         } finally {
           authSubmit.disabled = false;
         }
